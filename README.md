@@ -66,3 +66,9 @@ GROQ_API_KEY=sua_chave_da_api_aqui
 ```bash
 python app.py
 ```
+
+## 🗺️ Fluxograma de Funcionamento
+
+Abaixo está representado o fluxo de decisão e arquitetura de comunicação entre o Front-end, o servidor Flask e a inteligência da API do Groq:
+
+![Fluxograma do Chatbot](static/img/fluxograma.png)
