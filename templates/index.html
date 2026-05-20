@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoodWe ChargeGrid Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="status-indicator"></div>
+            <h2>GoodWe ChargeGrid Intelligence</h2>
+            <p>Suporte e Operações de Recarga Rápida</p>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            <div class="message bot-message">
+                Olá! Sou o assistente virtual do eletroposto GoodWe. Como posso te ajudar com a sua recarga, tarifas ou suporte técnico do totem hoje?
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <input type="text" id="user-input" placeholder="Pergunte sobre potência, tarifas, pagamento..." autocomplete="off">
+            <button id="send-btn">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+function appendMessage(text, sender) {
+    const messageDiv = document.createElement('div');
+    messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
+    
+    // Se a mensagem for do bot, aplica a formatação Markdown antes de exibir
+    if (sender === 'bot') {
+        messageDiv.innerHTML = formatMarkdown(text);
+    } else {
+        messageDiv.innerText = text; // Mensagem do usuário continua texto limpo
+    }
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight; 
+}
+
+function formatMarkdown(text) {
+    if (!text) return '';
+    
+    let html = text;
+    
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    html = html.split('\n').map(line => {
+        if (line.trim().startsWith('|')) {
+            if (line.includes('---')) return ''; 
+
+            let content = line.replace(/^\||\|$/g, '').split('|').map(c => c.trim()).join('  —  ');
+            return `• ${content}`;
+        }
+        return line;
+    }).filter(line => line !== '').join('\n');
+
+    html = html.replace(/\n/g, '<br>');
+    
+    return html;
+}
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            userInput.value = '';
+            appendMessage(text, 'user');
+
+            const typingDiv = document.createElement('div');
+            typingDiv.classList.add('message', 'bot-message', 'typing');
+            typingDiv.innerText = 'Buscando informações...';
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const response = await fetch('/enviar_mensagem', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ mensagem: text })
+                });
+
+                const data = response.get_json ? await response.get_json() : await response.json();
+                
+                chatMessages.removeChild(typingDiv);
+                appendMessage(data.resposta, 'bot');
+
+            } catch (error) {
+                chatMessages.removeChild(typingDiv);
+                appendMessage('Erro ao conectar ao servidor. Verifique o console ou o terminal.', 'bot');
+                console.error('Error:', error);
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
+</body>
+</html>
