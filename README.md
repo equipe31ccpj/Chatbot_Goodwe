@@ -57,11 +57,12 @@ Certifique-se de ter o **Python 3.x** instalado na sua máquina.
 No terminal, instale as bibliotecas listadas no arquivo `requirements.txt`:
 ```bash
 pip install -r requirements.txt
-
+```
 ### 2. Configurar a Chave da API
-
+```bash
 GROQ_API_KEY=sua_chave_da_api_aqui
-
+```
 ### 3. Iniciar o Servidor Flask
-
+```bash
 python app.py
+```
