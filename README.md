@@ -71,4 +71,4 @@ python app.py
 
 Abaixo está representado o fluxo de decisão e arquitetura de comunicação entre o Front-end, o servidor Flask e a inteligência da API do Groq:
 
-![Fluxograma do Chatbot](static/img/Diagrama_ChatBot.drawio.png)
+![Fluxograma do Chatbot](static/img/fluxograma.png)
