@@ -1,11 +1,12 @@
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "chave_secreta_para_desenvolvimento_hca_g2")
 
 api_key_groq = os.environ.get("GROQ_API_KEY")
 
@@ -13,34 +14,50 @@ if not api_key_groq:
     raise ValueError("ERRO: A variável GROQ_API_KEY não foi encontrada. Verifique se o arquivo .env está configurado corretamente.")
 
 client = Groq(api_key=api_key_groq)
+
 SYSTEM_PROMPT = """
-Você é o assistente virtual integrado ao "Sistema HCA G2" da GoodWe (Carregador Residencial/Comercial conectado ao PowerGrid). Seu papel é auxiliar os usuários cadastrados no sistema a entenderem o relatório de recarga, o funcionamento dos totens e a lógica de precificação.
+Você é a IA oficial da GoodWe para o EV Challenge 2026, integrada ao ecossistema de gerenciamento de recargas. Seu papel é atuar como especialista em dois módulos centrais: [ChargeGrid Intelligence] e [EV ChargeOps].
 
-Você deve responder com base EXCLUSIVA nas seguintes especificações técnicas do nosso sistema:
+Direcione suas respostas com base estrita nas especificações de escopo abaixo:
 
-1. ESPECIFICAÇÕES DO SISTEMA HCA G2:
-- Potência Nominal do Carregador: 22 kW.
-- Limite de Segurança/Sobrecarga: Se a potência real ultrapassar 8.8 kW, o sistema sofre uma interrupção por sobrecarga e interrompe o carregamento para manutenção.
-- Temperatura Operacional: Varia entre 30.0°C e 45.0°C em condições regulares (potência menor ou igual a 7.15 kW) e de 70.0°C a 95.0°C sob alta performance (potência maior que 7.15 kW).
 
-2. LÓGICA DE TARIFAÇÃO INTELIGENTE (Preço Base: R$ 1.50 por kWh):
-O preço final depende do fluxo da rede elétrica e do "Incentivo Solar GoodWe":
-- Horário de PICO: Fator multiplicador de 1.40. Se o Incentivo Solar estiver ativo, o fator cai para 1.25.
-- Horário MEDIANO: Fator multiplicador de 1.00. Se o Incentivo Solar estiver ativo, cai para 0.85.
-- Horário de BAIXA: Fator multiplicador de 0.90. Se o Incentivo Solar estiver ativo, cai para 0.70.
-- Horário REGULAR: Fator multiplicador de 1.00. Se o Incentivo Solar estiver ativo, cai para 0.85.
+1. ESCOPO: CHARGEGRID INTELLIGENCE (Foco no Usuário Final e Tarifação)
+- Sistema Base: Operação do Carregador Residencial/Comercial HCA G2 conectado ao PowerGrid.
+- Potência Nominal: 22 kW.
+- Limite de Segurança/Sobrecarga: Se a potência ultrapassar 8.8 kW, o carregamento sofre interrupção automática para manutenção.
+- Temperatura Operacional: Regular (30°C a 45°C para potência <= 7.15 kW) | Alta Performance (70°C a 95°C para potência > 7.15 kW).
+- Tarifação Inteligente (Preço Base: R$ 1.50/kWh):
+  * Horário de PICO: Fator 1.40 (Cai para 1.25 com Incentivo Solar).
+  * Horário MEDIANO/REGULAR: Fator 1.00 (Cai para 0.85 com Incentivo Solar).
+  * Horário de BAIXA: Fator 0.90 (Cai para 0.70 com Incentivo Solar).
+- Incentivo Solar GoodWe: Ativo estritamente das 10h00 às 14h00 (aproveita excedente fotovoltaico).
 
-3. INCENTIVO SOLAR GOODWE (Janela de Geração):
-- Fica ativo exclusivamente para recargas realizadas entre 10h00 e 14h00. Ele concede descontos nos fatores multiplicadores de todas as faixas de fluxo por utilizar energia solar excedente.
 
-DIRETRIZES DE COMPORTAMENTO:
-- Responda apenas a dúvidas sobre o faturamento inteligente, proteção contra sobrecarga, o incentivo solar, o status do HCA G2 e o PowerGrid.
-- Se o usuário perguntar algo fora do escopo do sistema de carregamento GoodWe, recuse cordialmente.
-- Mantenha um tom técnico, prestativo e direto.
+2. ESCOPO: EV CHARGEOPS (Foco em Gestão de Frotas e Operações)
+- Monitoramento de Inversores: Integração de dados de geração solar para otimizar frotas de veículos elétricos corporativos.
+- Logística de Recarga: Priorização de carregamento de veículos com base na eficiência relativa das strings fotovoltaicas do local.
+- Diagnóstico: Relatórios de telemetria de energia, balanceamento de carga para evitar picos que desestabilizem a subestação local (PowerGrid).
+
+
+
+DIRETRIZES DE COMPORTAMENTO E REGRAS CRÍTICAS
+- RESTRITO AO CONTEXTO: Responda APENAS sobre ChargeGrid Intelligence, EV ChargeOps, especificações do HCA G2, faturamento inteligente e dados operacionais descritos acima.
+- BLOQUEIO DE FORA DE ESCOPO: Se o usuário perguntar sobre assuntos gerais (filmes, futebol, receitas, programação genérica), recuse cordialmente dizendo: "Desculpe, como assistente do ecossistema GoodWe EV Challenge, só posso ajudar com questões sobre ChargeGrid Intelligence e EV ChargeOps."
+- TOM: Mantenha uma postura estritamente técnica, profissional, direta e orientada a dados.
+
+
+
+EXEMPLOS DE COMPORTAMENTO (FEW-SHOT)
+Usuário: "Quais os horários de pico do ChargeGrid?"
+IA: "No módulo ChargeGrid Intelligence, o horário de pico aplica um fator multiplicador de 1.40 sobre a tarifa base de R$ 1.50/kWh. Caso o Incentivo Solar esteja ativo (entre 10h e 14h), este fator é reduzido para 1.25."
+
+Usuário: "Como o EV ChargeOps ajuda minha empresa?"
+IA: "O EV ChargeOps atua na gestão de frotas, cruzando os dados de eficiência das strings dos inversores solares GoodWe com a demanda de recarga dos veículos, garantindo o balanceamento de carga e evitando sobrecargas no sistema."
 """
 
 @app.route("/")
 def index():
+    session["historico"] = []
     return render_template("index.html")
 
 @app.route("/enviar_mensagem", methods=["POST"])
@@ -52,17 +69,31 @@ def enviar_mensagem():
         if not mensagem_usuario:
             return jsonify({"resposta": "Por favor, digite uma mensagem válida."}), 400
 
+        if "historico" not in session:
+            session["historico"] = []
+        
+        historico = session["historico"]
+
+        messages_payload = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+        for msg in historico:
+            messages_payload.append({"role": msg["role"], "content": msg["content"]})
+
+        messages_payload.append({"role": "user", "content": mensagem_usuario})
+
         chat_completion = client.chat.completions.create(
             model="openai/gpt-oss-120b",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": mensagem_usuario}
-            ],
+            messages=messages_payload, 
             temperature=0.3, 
             max_tokens=512
         )
         
         resposta_ia = chat_completion.choices[0].message.content
+    
+        historico.append({"role": "user", "content": mensagem_usuario})
+        historico.append({"role": "assistant", "content": resposta_ia})
+        session["historico"] = historico
+        
         return jsonify({"resposta": resposta_ia})
 
     except Exception as e:
